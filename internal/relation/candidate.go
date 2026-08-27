@@ -87,8 +87,8 @@ func decideVerdict(sim float64, weave, dye string) string {
 		}
 		return model.VerdictConfirmed
 	case sim >= 0.7 && weave == "conflict":
-		// 外观高度相似但经纬交错规则相反/结构族不同 → 视觉巧合。
-		return model.VerdictPartial
+		// 外观高度相似但经纬交错规则相反/结构族不同 → 视觉巧合，判为工艺冲突。
+		return model.VerdictConflict
 	case sim >= 0.7 && weave == "partial":
 		return model.VerdictPartial
 	case sim >= 0.5:
