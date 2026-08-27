@@ -6,6 +6,8 @@
 //  3. 裁决规则：
 //     - 拓扑相似度 < 0.5 → 不生成候选（返回 rejected 语义）；
 //     - 拓扑相似且织造兼容（compatible）→ confirmed（强传承证据）；
+//     - 拓扑相似但染料证据冲突（dye=conflict）→ partial，染源/工艺链
+//       不一致令强传承证据不成立，需人工复核；
 //     - 拓扑相似但织造冲突（conflict，交错规则相反/结构族不同）→ conflict
 //       ——"相似但不同源"视觉巧合，端到端场景核心；
 //     - 其余 → candidate / partial，等待人工复核。
@@ -76,15 +78,23 @@ func Generate(in GenerateInput) (*Generated, error) {
 }
 
 // decideVerdict 把拓扑相似度与工艺兼容性映射为裁决。
+//
+// 染料证据（天然/合成类别冲突、碳同位素差异超阈）一旦冲突，即破坏
+// "同源传承"假设：即便拓扑相似、织造兼容，也只能判为 partial——
+// 染料类别不同指向不同染源/不同工艺链，必须等待人工复核。
 func decideVerdict(sim float64, weave, dye string) string {
 	switch {
 	case sim < 0.5:
 		return model.VerdictRejected
-	case sim >= 0.7 && weave == "compatible":
-		return model.VerdictConfirmed
 	case sim >= 0.7 && weave == "conflict":
 		// 外观高度相似但经纬交错规则相反/结构族不同 → 视觉巧合。
 		return model.VerdictConflict
+	case sim >= 0.7 && dye == "conflict":
+		// 织造不冲突但染料证据冲突（如天然茜草对合成分散蓝）：
+		// 染源/工艺链不一致，强传承证据不成立，降级为部分支持。
+		return model.VerdictPartial
+	case sim >= 0.7 && weave == "compatible":
+		return model.VerdictConfirmed
 	case sim >= 0.7 && weave == "partial":
 		return model.VerdictPartial
 	case sim >= 0.5:
