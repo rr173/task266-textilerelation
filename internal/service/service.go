@@ -352,10 +352,16 @@ func (s *Service) ShareVersion(id int64) (*model.RelationVersion, error) {
 	if err := versioning.Transition(v.Status, model.VersionShared); err != nil {
 		return nil, err
 	}
-	// 共享时锁定关系归属。
-	_ = store.ParseRelationIDs(v.RelationIDs)
+	// 共享时锁定关系归属：将收录的关系写上 version_id，
+	// 使后续追加反证时版本校验（VersionID>0）生效，不再自动改写裁决。
+	rids := store.ParseRelationIDs(v.RelationIDs)
 	if err := s.Store.Versions.UpdateStatus(id, model.VersionShared, ""); err != nil {
 		return nil, err
+	}
+	for _, rid := range rids {
+		if err := s.Store.Relations.AssignVersion(rid, id); err != nil {
+			return nil, err
+		}
 	}
 	return s.Store.Versions.Get(id)
 }

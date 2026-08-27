@@ -231,6 +231,16 @@ func runSmokeTest(dbPath string) error {
 	if _, err := svc.ShareVersion(version.ID); err != nil {
 		return fmt.Errorf("share version: %w", err)
 	}
+	// 共享时关系归属已锁定：version_id 必须写入关系，否则后续追加反证会
+	// 因 VersionID==0 走自动改写裁决分支，破坏版本锁定。
+	relBCShared, _, err := svc.GetRelation(relBC.ID)
+	if err != nil {
+		return fmt.Errorf("get shared relation: %w", err)
+	}
+	if relBCShared.VersionID != version.ID {
+		return fmt.Errorf("relation not locked to version: got version_id=%d want=%d",
+			relBCShared.VersionID, version.ID)
+	}
 	frozen, err := svc.FreezeVersion(version.ID)
 	if err != nil {
 		return fmt.Errorf("freeze version: %w", err)
