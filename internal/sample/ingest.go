@@ -86,6 +86,8 @@ func Ingest(samples *store.SampleStore, motifs *store.MotifStore, in IngestInput
 // contentHash 计算样本内容哈希：名称+出处+经纬参数+附带单元网格。
 //
 // 只对"结构特征"做摘要，不含 ID/时间，保证幂等。
+// 附带纹样网格参与计算：两个结构参数相同但纹样网格不同的样本
+// 不会被误判为同一记录（否则网格差异会被幂等命中吞掉）。
 func contentHash(in IngestInput) string {
 	names := make([]string, 0, len(in.MotifGrids))
 	for n := range in.MotifGrids {
@@ -95,7 +97,10 @@ func contentHash(in IngestInput) string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "%s|%s|%d|%d|%d|%d", in.Name, in.Provenance,
 		in.WarpCount, in.WeftCount, in.WarpDensity, in.WeftDensity)
-	_ = names
+	for _, n := range names {
+		// 名称与网格编码一并入摘要；网格为空也写入分隔以区分缺省与空串。
+		fmt.Fprintf(&sb, "|%s=%s", n, in.MotifGrids[n])
+	}
 	sum := sha256.Sum256([]byte(sb.String()))
 	return hex.EncodeToString(sum[:])
 }

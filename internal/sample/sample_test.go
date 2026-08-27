@@ -40,6 +40,40 @@ func TestIngestIdempotentByHash(t *testing.T) {
 	}
 }
 
+// TestIngestDifferentGridsNotIdempotent 覆盖回归：
+// 两个结构参数相同但纹样网格不同的样本必须分别建记录，
+// 第二次不能命中第一次的哈希而吞掉网格差异。
+func TestIngestDifferentGridsNotIdempotent(t *testing.T) {
+	samples, motifs, batches := openStores(t)
+	b, _ := batches.Create("b-grid", "")
+	structFields := IngestInput{
+		BatchID: b.ID, Name: "frag-g", Provenance: "site-g",
+		WarpCount: 8, WeftCount: 8, WarpDensity: 16, WeftDensity: 14,
+	}
+	first := withGrid(t, samples, motifs, structFields, "diamond", "##.#,.##.")
+	second := withGrid(t, samples, motifs, structFields, "diamond", "##.#,.###")
+	if first.ID == second.ID {
+		t.Fatalf("expected distinct record for different grid, both=%d (hash=%s)",
+			first.ID, first.SHA256)
+	}
+	if first.SHA256 == second.SHA256 {
+		t.Fatalf("hash collision: both=%s (grids differ but hash identical)", first.SHA256)
+	}
+}
+
+// withGrid 用相同结构参数 + 指定单元网格导入一次，返回创建的样本。
+func withGrid(t *testing.T, samples *store.SampleStore, motifs *store.MotifStore,
+	base IngestInput, name, grid string) *model.FabricSample {
+	t.Helper()
+	in := base
+	in.MotifGrids = map[string]string{name: grid}
+	s, created, err := Ingest(samples, motifs, in)
+	if err != nil || !created {
+		t.Fatalf("ingest grid=%q: created=%v err=%v", grid, created, err)
+	}
+	return s
+}
+
 func TestNextBatchStatusRequiresSamples(t *testing.T) {
 	if _, err := NextBatchStatus(model.BatchPending, 0, 0); err == nil {
 		t.Fatal("pending->ready without samples should fail")
