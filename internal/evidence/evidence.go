@@ -34,9 +34,10 @@ func AssessImpact(items []*model.CounterEvidence, currentVerdict string) Impact 
 	for _, it := range items {
 		kinds[it.Kind] = true
 		switch it.Kind {
+		case "patch":
+			imp.Downgrade = true
 		case "opposing_source", "stratigraphy":
 			imp.Reject = true
-
 		}
 	}
 	for k := range kinds {
