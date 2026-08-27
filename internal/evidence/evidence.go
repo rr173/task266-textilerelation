@@ -34,7 +34,8 @@ func AssessImpact(items []*model.CounterEvidence, currentVerdict string) Impact 
 	for _, it := range items {
 		kinds[it.Kind] = true
 		switch it.Kind {
-		case "stratigraphy":
+		case "opposing_source", "stratigraphy":
+			// 出处年代/遗址冲突与层位矛盾直接否决传承关系。
 			imp.Reject = true
 		case "patch":
 			imp.Downgrade = true
