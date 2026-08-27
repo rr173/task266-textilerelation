@@ -1,6 +1,7 @@
 package versioning
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -27,6 +28,15 @@ func TestDetectCycle(t *testing.T) {
 	// 三环
 	if err := DetectCycle([][2]int64{{1, 2}, {2, 3}, {3, 1}}); err == nil {
 		t.Fatal("expected 3-cycle")
+	}
+
+	// 两个单元互相确认传承（A→B 且 B→A）必须成环拒绝
+	err = DetectCycle([][2]int64{{1, 2}, {2, 1}})
+	if err == nil {
+		t.Fatal("expected mutual-confirmation cycle")
+	}
+	if !errors.Is(err, model.ErrCycle) {
+		t.Fatalf("want ErrCycle, got %v", err)
 	}
 }
 

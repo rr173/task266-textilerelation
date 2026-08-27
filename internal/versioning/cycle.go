@@ -60,10 +60,16 @@ func (d *cycleDetector) visit(n int64) {
 	for _, next := range d.adj[n] {
 		switch d.state[next] {
 		case 1:
-			if len(d.cycle) >= 3 {
-				d.has = true
-				return
+			// 命中当前递归栈中的节点即成环：自环(1)、双向边(2)、长链(>=3)
+			// 一律拒绝。截取从该节点起的路径作为成环证据。
+			d.has = true
+			i := 0
+			for i < len(d.cycle) && d.cycle[i] != next {
+				i++
 			}
+			d.cycle = d.cycle[i:]
+			d.cycle = append(d.cycle, next)
+			return
 		case 0:
 			d.visit(next)
 			if d.has {
