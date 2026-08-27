@@ -121,11 +121,15 @@ func (r *RelationStore) AssignVersion(id, versionID int64) error {
 }
 
 // UpdateVerdict 条件更新裁决：仅当当前裁决与 expect 一致时才写入（版本校验，防并发覆盖）。
+//
+// 并发复核时，数据库以 WHERE verdict=expect 作为乐观锁：先到的裁决改写
+// verdict 后，后到的旧 expect 不再匹配，更新影响行数为 0，此时返回
+// StateMismatchError，保证后写者无法把已被推翻/确认的裁决改回去。
 func (r *RelationStore) UpdateVerdict(id int64, expect, verdict, summary string) error {
 	res, err := r.db.Exec(
 		`UPDATE relations SET verdict=?, summary=?, updated_at=?
-		 WHERE id=?`,
-		verdict, summary, time.Now().UTC().Format(time.RFC3339), id)
+		 WHERE id=? AND verdict=?`,
+		verdict, summary, time.Now().UTC().Format(time.RFC3339), id, expect)
 	if err != nil {
 		return err
 	}
@@ -133,8 +137,10 @@ func (r *RelationStore) UpdateVerdict(id int64, expect, verdict, summary string)
 	if n == 0 {
 		cur, gerr := r.Get(id)
 		if gerr != nil {
+			// 行不存在 → ErrNotFound（scanRelation 已映射）；其他 DB 错误原样上抛。
 			return gerr
 		}
+		// 行存在但 verdict≠expect：旧裁决已被并发请求改写。
 		return &StateMismatchError{ID: id, Current: cur.Verdict, Want: expect}
 	}
 	return nil
