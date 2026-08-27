@@ -296,7 +296,11 @@ func (s *Service) AddCounterEvidence(relationID int64, kind, description, ref st
 	if err != nil {
 		return created, nil
 	}
-	_ = r.VersionID
+	// 已收录进版本的关系归属已锁定（shared 之后不可变）：反证照常登记
+	// 为客观记录，但不再据此自动改写裁决。如需更正裁决，应发布新版本替代。
+	if r.VersionID != 0 {
+		return created, nil
+	}
 	items, err := s.Store.Evidence.ListByRelation(relationID)
 	if err != nil {
 		return created, nil
